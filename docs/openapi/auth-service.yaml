@@ -1,0 +1,484 @@
+openapi: 3.0.3
+info:
+  title: CommerceSphere Auth Service API
+  description: Authentication and authorization service for CommerceSphere platform
+  version: 1.0.0
+  contact:
+    name: CommerceSphere API Support
+    email: api-support@commercesphere.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: https://api.commercesphere.com/auth
+    description: Production server
+  - url: https://staging-api.commercesphere.com/auth
+    description: Staging server
+  - url: http://localhost:3001
+    description: Local development server
+
+tags:
+  - name: Authentication
+    description: User authentication operations
+  - name: User Management
+    description: User profile operations
+  - name: Password Reset
+    description: Password reset operations
+
+paths:
+  /register:
+    post:
+      tags:
+        - Authentication
+      summary: Register a new user
+      description: Create a new user account with email and password
+      operationId: registerUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+            examples:
+              customer:
+                summary: Register customer
+                value:
+                  email: customer@example.com
+                  password: SecurePass123!
+                  name: John Doe
+      responses:
+        '201':
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                weakPassword:
+                  summary: Weak password
+                  value:
+                    error:
+                      code: VALIDATION_ERROR
+                      message: Password does not meet requirements
+                      details:
+                        password: Password must be at least 8 characters with uppercase, lowercase, and numbers
+        '409':
+          description: Email already registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /login:
+    post:
+      tags:
+        - Authentication
+      summary: Login user
+      description: Authenticate user and receive access tokens
+      operationId: loginUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /refresh:
+    post:
+      tags:
+        - Authentication
+      summary: Refresh access token
+      description: Get a new access token using refresh token
+      operationId: refreshToken
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshRequest'
+      responses:
+        '200':
+          description: Token refreshed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RefreshResponse'
+        '401':
+          description: Invalid or expired refresh token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /logout:
+    post:
+      tags:
+        - Authentication
+      summary: Logout user
+      description: Invalidate refresh token
+      operationId: logoutUser
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LogoutRequest'
+      responses:
+        '200':
+          description: Logout successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      message:
+                        type: string
+                        example: Logout successful
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /me:
+    get:
+      tags:
+        - User Management
+      summary: Get current user
+      description: Get authenticated user's profile
+      operationId: getCurrentUser
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: User profile retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/User'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /password-reset-request:
+    post:
+      tags:
+        - Password Reset
+      summary: Request password reset
+      description: Request a password reset token
+      operationId: requestPasswordReset
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasswordResetRequest'
+      responses:
+        '200':
+          description: Password reset email sent
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      message:
+                        type: string
+                        example: Password reset email sent
+        '400':
+          description: Invalid email
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /password-reset:
+    post:
+      tags:
+        - Password Reset
+      summary: Complete password reset
+      description: Reset password using reset token
+      operationId: resetPassword
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasswordResetComplete'
+      responses:
+        '200':
+          description: Password reset successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      message:
+                        type: string
+                        example: Password reset successful
+        '400':
+          description: Invalid or expired token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /health:
+    get:
+      tags:
+        - Health
+      summary: Health check
+      description: Check service health
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: healthy
+                  timestamp:
+                    type: string
+                    format: date-time
+
+components:
+  schemas:
+    RegisterRequest:
+      type: object
+      required:
+        - email
+        - password
+        - name
+      properties:
+        email:
+          type: string
+          format: email
+          example: user@example.com
+        password:
+          type: string
+          format: password
+          minLength: 8
+          example: SecurePass123!
+        name:
+          type: string
+          minLength: 1
+          example: John Doe
+
+    LoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          example: user@example.com
+        password:
+          type: string
+          format: password
+          example: SecurePass123!
+
+    RefreshRequest:
+      type: object
+      required:
+        - refreshToken
+      properties:
+        refreshToken:
+          type: string
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+    LogoutRequest:
+      type: object
+      required:
+        - refreshToken
+      properties:
+        refreshToken:
+          type: string
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+    PasswordResetRequest:
+      type: object
+      required:
+        - email
+      properties:
+        email:
+          type: string
+          format: email
+          example: user@example.com
+
+    PasswordResetComplete:
+      type: object
+      required:
+        - token
+        - newPassword
+      properties:
+        token:
+          type: string
+          example: reset-token-from-email
+        newPassword:
+          type: string
+          format: password
+          minLength: 8
+          example: NewSecurePass123!
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: 550e8400-e29b-41d4-a716-446655440000
+        email:
+          type: string
+          format: email
+          example: user@example.com
+        name:
+          type: string
+          example: John Doe
+        role:
+          type: string
+          enum: [customer, admin, moderator]
+          example: customer
+        createdAt:
+          type: string
+          format: date-time
+          example: 2024-01-15T10:30:00.000Z
+        updatedAt:
+          type: string
+          format: date-time
+          example: 2024-01-15T10:30:00.000Z
+
+    Tokens:
+      type: object
+      properties:
+        accessToken:
+          type: string
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        refreshToken:
+          type: string
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        expiresIn:
+          type: integer
+          description: Access token expiration in seconds
+          example: 3600
+
+    AuthResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            user:
+              $ref: '#/components/schemas/User'
+            tokens:
+              $ref: '#/components/schemas/Tokens'
+
+    RefreshResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            accessToken:
+              type: string
+              example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+            expiresIn:
+              type: integer
+              example: 3600
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              example: VALIDATION_ERROR
+            message:
+              type: string
+              example: Invalid input data
+            details:
+              type: object
+              additionalProperties: true
+            timestamp:
+              type: string
+              format: date-time
+              example: 2024-01-15T10:30:00.000Z
+            path:
+              type: string
+              example: /auth/register
+            correlationId:
+              type: string
+              example: abc-123-def
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT access token
+
+  responses:
+    UnauthorizedError:
+      description: Access token is missing or invalid
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    BadRequestError:
+      description: Invalid request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'

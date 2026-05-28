@@ -1,0 +1,277 @@
+# Product Service Kubernetes Manifests
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: product-service
+  namespace: default
+  labels:
+    app: product-service
+    tier: backend
+    component: catalog
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: product-service
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: product-service
+        tier: backend
+        component: catalog
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "3000"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+      - name: product-service
+        image: commercesphere/product-service:latest
+        imagePullPolicy: Always
+        ports:
+        - name: http
+          containerPort: 3000
+          protocol: TCP
+        - name: metrics
+          containerPort: 9090
+          protocol: TCP
+        
+        env:
+        # From ConfigMap
+        - name: NODE_ENV
+          valueFrom:
+            configMapKeyRef:
+              name: product-service-config
+              key: NODE_ENV
+        - name: PORT
+          valueFrom:
+            configMapKeyRef:
+              name: product-service-config
+              key: PORT
+        - name: SERVICE_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: product-service-config
+              key: SERVICE_NAME
+        - name: CACHE_TTL_PRODUCTS
+          valueFrom:
+            configMapKeyRef:
+              name: product-service-config
+              key: CACHE_TTL_PRODUCTS
+        - name: CACHE_TTL_PRODUCT_LIST
+          valueFrom:
+            configMapKeyRef:
+              name: product-service-config
+              key: CACHE_TTL_PRODUCT_LIST
+        - name: S3_ENDPOINT
+          valueFrom:
+            configMapKeyRef:
+              name: product-service-config
+              key: S3_ENDPOINT
+        - name: S3_REGION
+          valueFrom:
+            configMapKeyRef:
+              name: product-service-config
+              key: S3_REGION
+        - name: CDN_BASE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: product-service-config
+              key: CDN_BASE_URL
+        - name: PRESIGNED_URL_EXPIRY
+          valueFrom:
+            configMapKeyRef:
+              name: product-service-config
+              key: PRESIGNED_URL_EXPIRY
+        - name: MAX_IMAGE_SIZE_MB
+          valueFrom:
+            configMapKeyRef:
+              name: product-service-config
+              key: MAX_IMAGE_SIZE_MB
+        - name: RESERVATION_EXPIRY_MINUTES
+          valueFrom:
+            configMapKeyRef:
+              name: product-service-config
+              key: RESERVATION_EXPIRY_MINUTES
+        - name: RESERVATION_CHECK_INTERVAL_SECONDS
+          valueFrom:
+            configMapKeyRef:
+              name: product-service-config
+              key: RESERVATION_CHECK_INTERVAL_SECONDS
+        
+        # Shared Config
+        - name: LOG_LEVEL
+          valueFrom:
+            configMapKeyRef:
+              name: shared-config
+              key: LOG_LEVEL
+        - name: LOG_FORMAT
+          valueFrom:
+            configMapKeyRef:
+              name: shared-config
+              key: LOG_FORMAT
+        - name: KAFKA_BROKERS
+          valueFrom:
+            configMapKeyRef:
+              name: shared-config
+              key: KAFKA_BROKERS
+        - name: REDIS_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: shared-config
+              key: REDIS_HOST
+        - name: REDIS_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: shared-config
+              key: REDIS_PORT
+        - name: JAEGER_AGENT_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: shared-config
+              key: JAEGER_AGENT_HOST
+        - name: JAEGER_AGENT_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: shared-config
+              key: JAEGER_AGENT_PORT
+        
+        # From Secrets
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: product-service-secrets
+              key: database-url
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: shared-secrets
+              key: redis-password
+              optional: true
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: product-service-secrets
+              key: aws-access-key-id
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: product-service-secrets
+              key: aws-secret-access-key
+        - name: S3_BUCKET_NAME
+          valueFrom:
+            secretKeyRef:
+              name: product-service-secrets
+              key: s3-bucket-name
+        
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+        
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: false
+          capabilities:
+            drop:
+            - ALL
+      
+      securityContext:
+        fsGroup: 1000
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: product-service
+  namespace: default
+  labels:
+    app: product-service
+spec:
+  type: ClusterIP
+  selector:
+    app: product-service
+  ports:
+  - name: http
+    port: 80
+    targetPort: 3000
+    protocol: TCP
+  - name: metrics
+    port: 9090
+    targetPort: 9090
+    protocol: TCP
+  sessionAffinity: None
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: product-service-hpa
+  namespace: default
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: product-service
+  minReplicas: 3
+  maxReplicas: 15
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 30
+      - type: Pods
+        value: 3
+        periodSeconds: 30
+      selectPolicy: Max

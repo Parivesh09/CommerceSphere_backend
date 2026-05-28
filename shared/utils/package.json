@@ -1,0 +1,20 @@
+{
+  "name": "@commercesphere/utils",
+  "version": "1.0.0",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch"
+  },
+  "dependencies": {
+    "@commercesphere/types": "*",
+    "winston": "^3.11.0",
+    "kafkajs": "^2.2.4",
+    "prom-client": "^15.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "typescript": "^5.3.2"
+  }
+}

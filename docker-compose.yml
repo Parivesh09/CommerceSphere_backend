@@ -1,0 +1,172 @@
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: commercesphere-postgres
+    environment:
+      POSTGRES_USER: commercesphere
+      POSTGRES_PASSWORD: commercesphere_dev
+      POSTGRES_DB: commercesphere
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-databases.sql:/docker-entrypoint-initdb.d/init-databases.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U commercesphere"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: commercesphere-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Zookeeper (required for Kafka)
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: commercesphere-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    volumes:
+      - zookeeper_data:/var/lib/zookeeper/data
+      - zookeeper_logs:/var/lib/zookeeper/log
+
+  # Kafka Message Broker
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: commercesphere-kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+      - "9093:9093"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,PLAINTEXT_INTERNAL://kafka:9093
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT_INTERNAL
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+
+  # Elasticsearch for Search Service
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    container_name: commercesphere-elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # API Gateway
+  gateway:
+    build:
+      context: .
+      dockerfile: services/gateway/Dockerfile
+    container_name: commercesphere-gateway
+    depends_on:
+      - redis
+    ports:
+      - "3000:3000"
+    environment:
+      PORT: 3000
+      JWT_SECRET: dev-secret-change-in-production
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      AUTH_SERVICE_URL: http://auth:3001
+      PRODUCT_SERVICE_URL: http://product:3002
+      ORDER_SERVICE_URL: http://order:3003
+      PAYMENT_SERVICE_URL: http://payment:3004
+      NOTIFICATION_SERVICE_URL: http://notification:3005
+      SEARCH_SERVICE_URL: http://search:3006
+      RECOMMENDATION_SERVICE_URL: http://recommendation:3007
+      ANALYTICS_SERVICE_URL: http://analytics:3008
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Auth Service
+  auth:
+    build:
+      context: .
+      dockerfile: services/auth/Dockerfile
+    container_name: commercesphere-auth
+    depends_on:
+      - postgres
+      - redis
+    ports:
+      - "3001:3001"
+    environment:
+      PORT: 3001
+      JWT_SECRET: dev-secret-change-in-production
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: auth_service
+      DB_USER: commercesphere
+      DB_PASSWORD: commercesphere_dev
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+
+  # Product Service
+  product:
+    build:
+      context: .
+      dockerfile: services/product/Dockerfile
+    container_name: commercesphere-product
+    depends_on:
+      - postgres
+      - redis
+      - kafka
+    ports:
+      - "3002:3002"
+    environment:
+      PORT: 3002
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: product_service
+      DB_USER: commercesphere
+      DB_PASSWORD: commercesphere_dev
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      KAFKA_BROKERS: kafka:9093
+
+volumes:
+  postgres_data:
+  redis_data:
+  zookeeper_data:
+  zookeeper_logs:
+  kafka_data:
+  elasticsearch_data:

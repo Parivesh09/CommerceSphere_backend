@@ -1,0 +1,258 @@
+# ConfigMaps for CommerceSphere Microservices
+# Non-sensitive configuration that can be shared across services
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: shared-config
+  namespace: default
+data:
+  # Kafka Configuration
+  KAFKA_BROKERS: "kafka-1:9092,kafka-2:9092,kafka-3:9092"
+  KAFKA_CLIENT_ID: "commercesphere"
+  
+  # Redis Configuration
+  REDIS_HOST: "redis"
+  REDIS_PORT: "6379"
+  REDIS_DB: "0"
+  
+  # Elasticsearch Configuration
+  ELASTICSEARCH_HOST: "elasticsearch"
+  ELASTICSEARCH_PORT: "9200"
+  
+  # Observability
+  LOG_LEVEL: "info"
+  LOG_FORMAT: "json"
+  ENABLE_METRICS: "true"
+  ENABLE_TRACING: "true"
+  
+  # Jaeger Configuration
+  JAEGER_AGENT_HOST: "jaeger-agent"
+  JAEGER_AGENT_PORT: "6831"
+  
+  # Prometheus Configuration
+  PROMETHEUS_PORT: "9090"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: auth-service-config
+  namespace: default
+data:
+  NODE_ENV: "production"
+  PORT: "3000"
+  SERVICE_NAME: "auth-service"
+  
+  # JWT Configuration
+  JWT_ACCESS_TOKEN_EXPIRY: "1h"
+  JWT_REFRESH_TOKEN_EXPIRY: "7d"
+  
+  # Password Configuration
+  BCRYPT_ROUNDS: "12"
+  
+  # Rate Limiting (handled by gateway, but kept for reference)
+  RATE_LIMIT_WINDOW_MS: "60000"
+  RATE_LIMIT_MAX_REQUESTS: "100"
+  
+  # CORS Configuration
+  CORS_ENABLED: "true"
+  CORS_ALLOWED_ORIGINS: "https://app.commercesphere.com,https://admin.commercesphere.com"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: product-service-config
+  namespace: default
+data:
+  NODE_ENV: "production"
+  PORT: "3000"
+  SERVICE_NAME: "product-service"
+  
+  # Cache Configuration
+  CACHE_TTL_PRODUCTS: "3600"
+  CACHE_TTL_PRODUCT_LIST: "300"
+  
+  # S3/MinIO Configuration
+  S3_ENDPOINT: "https://s3.amazonaws.com"
+  S3_REGION: "us-east-1"
+  CDN_BASE_URL: "https://cdn.commercesphere.com"
+  
+  # Image Upload Configuration
+  PRESIGNED_URL_EXPIRY: "900"
+  MAX_IMAGE_SIZE_MB: "10"
+  
+  # Inventory Reservation
+  RESERVATION_EXPIRY_MINUTES: "15"
+  RESERVATION_CHECK_INTERVAL_SECONDS: "60"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: order-service-config
+  namespace: default
+data:
+  NODE_ENV: "production"
+  PORT: "3000"
+  SERVICE_NAME: "order-service"
+  
+  # Saga Configuration
+  SAGA_TIMEOUT_SECONDS: "300"
+  SAGA_RETRY_ATTEMPTS: "3"
+  SAGA_RETRY_DELAY_MS: "1000"
+  
+  # Order Configuration
+  ORDER_CANCELLATION_WINDOW_HOURS: "24"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: payment-service-config
+  namespace: default
+data:
+  NODE_ENV: "production"
+  PORT: "3000"
+  SERVICE_NAME: "payment-service"
+  
+  # Payment Configuration
+  PAYMENT_TIMEOUT_SECONDS: "30"
+  PAYMENT_RETRY_ATTEMPTS: "3"
+  CURRENCY: "USD"
+  
+  # Stripe Configuration
+  STRIPE_API_VERSION: "2023-10-16"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: notification-service-config
+  namespace: default
+data:
+  NODE_ENV: "production"
+  PORT: "3000"
+  SERVICE_NAME: "notification-service"
+  
+  # Retry Configuration
+  NOTIFICATION_RETRY_ATTEMPTS: "3"
+  NOTIFICATION_RETRY_DELAYS: "60000,300000,900000"
+  
+  # Channel Configuration
+  EMAIL_ENABLED: "true"
+  SMS_ENABLED: "true"
+  PUSH_ENABLED: "true"
+  
+  # SendGrid Configuration
+  SENDGRID_FROM_EMAIL: "noreply@commercesphere.com"
+  SENDGRID_FROM_NAME: "CommerceSphere"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: search-service-config
+  namespace: default
+data:
+  NODE_ENV: "production"
+  PORT: "3000"
+  SERVICE_NAME: "search-service"
+  
+  # Elasticsearch Configuration
+  ES_INDEX_NAME: "products"
+  ES_MAX_RESULTS: "100"
+  
+  # Search Configuration
+  SEARCH_CACHE_TTL: "300"
+  AUTOCOMPLETE_MIN_LENGTH: "2"
+  FUZZY_MATCH_ENABLED: "true"
+  FUZZY_MAX_EDITS: "2"
+  
+  # Indexing Configuration
+  INDEX_BATCH_SIZE: "100"
+  INDEX_TIMEOUT_SECONDS: "5"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: recommendation-service-config
+  namespace: default
+data:
+  # Python service uses different env var naming
+  ENVIRONMENT: "production"
+  PORT: "8000"
+  SERVICE_NAME: "recommendation-service"
+  
+  # Cache Configuration
+  CACHE_TTL_RECOMMENDATIONS: "3600"
+  CACHE_TTL_TRENDING: "3600"
+  
+  # Algorithm Configuration
+  COLLABORATIVE_FILTERING_ENABLED: "true"
+  CONTENT_BASED_FILTERING_ENABLED: "true"
+  MIN_SIMILAR_USERS: "5"
+  MAX_RECOMMENDATIONS: "20"
+  
+  # Trending Configuration
+  TRENDING_TIME_DECAY_HOURS: "168"
+  TRENDING_VIEW_WEIGHT: "0.3"
+  TRENDING_PURCHASE_WEIGHT: "0.7"
+  TRENDING_UPDATE_INTERVAL_SECONDS: "3600"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: analytics-service-config
+  namespace: default
+data:
+  NODE_ENV: "production"
+  PORT: "3000"
+  SERVICE_NAME: "analytics-service"
+  
+  # TimescaleDB Configuration
+  TIMESCALE_ENABLED: "true"
+  
+  # Aggregation Configuration
+  BATCH_AGGREGATION_INTERVAL_SECONDS: "3600"
+  REALTIME_METRICS_ENABLED: "true"
+  
+  # Retention Configuration
+  RAW_EVENTS_RETENTION_DAYS: "90"
+  AGGREGATED_DATA_RETENTION_DAYS: "0"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gateway-config
+  namespace: default
+data:
+  NODE_ENV: "production"
+  PORT: "8080"
+  SERVICE_NAME: "api-gateway"
+  
+  # Service URLs
+  AUTH_SERVICE_URL: "http://auth-service"
+  PRODUCT_SERVICE_URL: "http://product-service"
+  ORDER_SERVICE_URL: "http://order-service"
+  PAYMENT_SERVICE_URL: "http://payment-service"
+  NOTIFICATION_SERVICE_URL: "http://notification-service"
+  SEARCH_SERVICE_URL: "http://search-service"
+  RECOMMENDATION_SERVICE_URL: "http://recommendation-service"
+  ANALYTICS_SERVICE_URL: "http://analytics-service"
+  
+  # Rate Limiting
+  RATE_LIMIT_ENABLED: "true"
+  RATE_LIMIT_WINDOW_MS: "60000"
+  RATE_LIMIT_MAX_REQUESTS: "100"
+  
+  # Timeout Configuration
+  REQUEST_TIMEOUT_MS: "30000"
+  
+  # SSL Configuration
+  SSL_ENABLED: "true"

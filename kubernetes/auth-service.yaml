@@ -1,0 +1,252 @@
+# Auth Service Kubernetes Manifests
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auth-service
+  namespace: default
+  labels:
+    app: auth-service
+    tier: backend
+    component: authentication
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: auth-service
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: auth-service
+        tier: backend
+        component: authentication
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "3000"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+      - name: auth-service
+        image: commercesphere/auth-service:latest
+        imagePullPolicy: Always
+        ports:
+        - name: http
+          containerPort: 3000
+          protocol: TCP
+        - name: metrics
+          containerPort: 9090
+          protocol: TCP
+        
+        env:
+        # From ConfigMap
+        - name: NODE_ENV
+          valueFrom:
+            configMapKeyRef:
+              name: auth-service-config
+              key: NODE_ENV
+        - name: PORT
+          valueFrom:
+            configMapKeyRef:
+              name: auth-service-config
+              key: PORT
+        - name: SERVICE_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: auth-service-config
+              key: SERVICE_NAME
+        - name: JWT_ACCESS_TOKEN_EXPIRY
+          valueFrom:
+            configMapKeyRef:
+              name: auth-service-config
+              key: JWT_ACCESS_TOKEN_EXPIRY
+        - name: JWT_REFRESH_TOKEN_EXPIRY
+          valueFrom:
+            configMapKeyRef:
+              name: auth-service-config
+              key: JWT_REFRESH_TOKEN_EXPIRY
+        - name: BCRYPT_ROUNDS
+          valueFrom:
+            configMapKeyRef:
+              name: auth-service-config
+              key: BCRYPT_ROUNDS
+        - name: CORS_ENABLED
+          valueFrom:
+            configMapKeyRef:
+              name: auth-service-config
+              key: CORS_ENABLED
+        - name: CORS_ALLOWED_ORIGINS
+          valueFrom:
+            configMapKeyRef:
+              name: auth-service-config
+              key: CORS_ALLOWED_ORIGINS
+        
+        # Shared Config
+        - name: LOG_LEVEL
+          valueFrom:
+            configMapKeyRef:
+              name: shared-config
+              key: LOG_LEVEL
+        - name: LOG_FORMAT
+          valueFrom:
+            configMapKeyRef:
+              name: shared-config
+              key: LOG_FORMAT
+        - name: KAFKA_BROKERS
+          valueFrom:
+            configMapKeyRef:
+              name: shared-config
+              key: KAFKA_BROKERS
+        - name: REDIS_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: shared-config
+              key: REDIS_HOST
+        - name: REDIS_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: shared-config
+              key: REDIS_PORT
+        - name: JAEGER_AGENT_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: shared-config
+              key: JAEGER_AGENT_HOST
+        - name: JAEGER_AGENT_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: shared-config
+              key: JAEGER_AGENT_PORT
+        
+        # From Secrets
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: auth-service-secrets
+              key: jwt-secret
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: auth-service-secrets
+              key: database-url
+        - name: ENCRYPTION_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: auth-service-secrets
+              key: encryption-key
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: shared-secrets
+              key: redis-password
+              optional: true
+        
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: false
+          capabilities:
+            drop:
+            - ALL
+      
+      securityContext:
+        fsGroup: 1000
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: auth-service
+  namespace: default
+  labels:
+    app: auth-service
+spec:
+  type: ClusterIP
+  selector:
+    app: auth-service
+  ports:
+  - name: http
+    port: 80
+    targetPort: 3000
+    protocol: TCP
+  - name: metrics
+    port: 9090
+    targetPort: 9090
+    protocol: TCP
+  sessionAffinity: None
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: auth-service-hpa
+  namespace: default
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: auth-service
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 30
+      - type: Pods
+        value: 2
+        periodSeconds: 30
+      selectPolicy: Max
