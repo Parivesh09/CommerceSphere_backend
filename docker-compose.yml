@@ -162,6 +162,13 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
       KAFKA_BROKERS: kafka:9093
+      AWS_REGION: us-east-1
+      S3_BUCKET: commercesphere-products-dev
+      S3_ENDPOINT: http://localhost:9000
+      AWS_ACCESS_KEY_ID: minioadmin
+      AWS_SECRET_ACCESS_KEY: minioadmin
+      CDN_BASE_URL: http://localhost:9000
+      LOW_STOCK_THRESHOLD: 10
 
 volumes:
   postgres_data:
