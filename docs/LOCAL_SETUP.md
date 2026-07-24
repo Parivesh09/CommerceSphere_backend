@@ -31,6 +31,19 @@ Run all infrastructure only
 npm run dev
 ```
 
+Initialize databases and seed sample data
+
+```bash
+npm run db:init
+npm run db:seed
+```
+
+Or run both in one step:
+
+```bash
+npm run db:setup
+```
+
 Stop infra
 
 ```bash

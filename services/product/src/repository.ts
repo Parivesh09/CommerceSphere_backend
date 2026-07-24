@@ -1,7 +1,7 @@
 import { pool } from './database';
 import { Product, ProductVariant, Category, ProductImage, InventoryReservation, CreateProductRequest, UpdateProductRequest, CreateCategoryRequest, UpdateCategoryRequest, CreateVariantRequest, UpdateVariantRequest, ProductListQuery } from './types';
 import { createLogger } from '@commercesphere/utils';
-import { Pool, PoolClient } from 'pg';
+import { Pool } from 'pg';
 
 const logger = createLogger({ serviceName: 'product-service' });
 

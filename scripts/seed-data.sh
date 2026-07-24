@@ -113,18 +113,19 @@ print_info "Creating product categories..."
 
 if [ -n "$ADMIN_TOKEN" ]; then
     CATEGORIES=(
-        '{"name":"Electronics","slug":"electronics","description":"Electronic devices and accessories"}'
-        '{"name":"Clothing","slug":"clothing","description":"Apparel and fashion items"}'
-        '{"name":"Home & Kitchen","slug":"home-kitchen","description":"Home and kitchen essentials"}'
-        '{"name":"Sports","slug":"sports","description":"Sports and fitness equipment"}'
-        '{"name":"Accessories","slug":"accessories","description":"Various accessories"}'
-        '{"name":"Home & Office","slug":"home-office","description":"Home and office supplies"}'
+        '{"name":"Electronics","slug":"electronics"}'
+        '{"name":"Clothing","slug":"clothing"}'
+        '{"name":"Home & Kitchen","slug":"home-kitchen"}'
+        '{"name":"Sports","slug":"sports"}'
+        '{"name":"Accessories","slug":"accessories"}'
+        '{"name":"Home & Office","slug":"home-office"}'
     )
     
     CATEGORY_IDS=()
     
     for category_data in "${CATEGORIES[@]}"; do
         name=$(echo "$category_data" | grep -o '"name":"[^"]*' | cut -d'"' -f4)
+        slug=$(echo "$category_data" | grep -o '"slug":"[^"]*' | cut -d'"' -f4)
         CATEGORY_RESPONSE=$(curl -s -X POST "$PRODUCT_SERVICE/categories" \
           -H "Content-Type: application/json" \
           -H "Authorization: Bearer $ADMIN_TOKEN" \
@@ -134,8 +135,17 @@ if [ -n "$ADMIN_TOKEN" ]; then
             CATEGORY_ID=$(echo "$CATEGORY_RESPONSE" | grep -o '"id":"[^"]*' | cut -d'"' -f4)
             CATEGORY_IDS+=("$CATEGORY_ID")
             print_success "Category created: $name (ID: ${CATEGORY_ID:0:8}...)"
+        elif echo "$CATEGORY_RESPONSE" | grep -q 'already exists'; then
+            CATEGORY_ID=$(curl -s "$PRODUCT_SERVICE/categories" | python3 -c 'import json,sys; data=json.load(sys.stdin); print(next((c["id"] for c in data if c.get("slug") == sys.argv[1]), ""))' "$slug")
+            if [ -n "$CATEGORY_ID" ]; then
+                CATEGORY_IDS+=("$CATEGORY_ID")
+                print_success "Category already exists: $name (ID: ${CATEGORY_ID:0:8}...)"
+            else
+                print_warning "Could not resolve existing category: $name"
+            fi
         else
             print_warning "Failed to create category: $name"
+            echo "   Response: $CATEGORY_RESPONSE"
         fi
     done
     
@@ -153,16 +163,16 @@ if [ -n "$ADMIN_TOKEN" ]; then
     HOME_OFFICE_ID="${CATEGORY_IDS[5]}"
     
     PRODUCTS=(
-        "{\"title\":\"Wireless Bluetooth Headphones\",\"description\":\"Premium noise-cancelling headphones with 30-hour battery life\",\"price\":129.99,\"categoryId\":\"$ELECTRONICS_ID\",\"sku\":\"WBH-001\",\"stock\":50}"
-        "{\"title\":\"Smart Fitness Watch\",\"description\":\"Track your health and fitness with GPS and heart rate monitoring\",\"price\":199.99,\"categoryId\":\"$ELECTRONICS_ID\",\"sku\":\"SFW-002\",\"stock\":30}"
-        "{\"title\":\"Organic Cotton T-Shirt\",\"description\":\"Comfortable and sustainable everyday wear\",\"price\":29.99,\"categoryId\":\"$CLOTHING_ID\",\"sku\":\"OCT-003\",\"stock\":100}"
-        "{\"title\":\"Stainless Steel Water Bottle\",\"description\":\"Keep your drinks cold for 24 hours or hot for 12 hours\",\"price\":34.99,\"categoryId\":\"$HOME_KITCHEN_ID\",\"sku\":\"SSWB-004\",\"stock\":75}"
-        "{\"title\":\"Yoga Mat Premium\",\"description\":\"Non-slip eco-friendly yoga mat with carrying strap\",\"price\":49.99,\"categoryId\":\"$SPORTS_ID\",\"sku\":\"YMP-005\",\"stock\":40}"
-        "{\"title\":\"Laptop Backpack\",\"description\":\"Durable backpack with padded laptop compartment\",\"price\":79.99,\"categoryId\":\"$ACCESSORIES_ID\",\"sku\":\"LBP-006\",\"stock\":60}"
-        "{\"title\":\"Wireless Mouse\",\"description\":\"Ergonomic wireless mouse with precision tracking\",\"price\":39.99,\"categoryId\":\"$ELECTRONICS_ID\",\"sku\":\"WM-007\",\"stock\":80}"
-        "{\"title\":\"Coffee Maker\",\"description\":\"Programmable coffee maker with thermal carafe\",\"price\":89.99,\"categoryId\":\"$HOME_KITCHEN_ID\",\"sku\":\"CM-008\",\"stock\":25}"
-        "{\"title\":\"Running Shoes\",\"description\":\"Lightweight running shoes with superior cushioning\",\"price\":119.99,\"categoryId\":\"$SPORTS_ID\",\"sku\":\"RS-009\",\"stock\":45}"
-        "{\"title\":\"Desk Lamp LED\",\"description\":\"Adjustable LED desk lamp with USB charging port\",\"price\":44.99,\"categoryId\":\"$HOME_OFFICE_ID\",\"sku\":\"DL-010\",\"stock\":55}"
+        "{\"title\":\"Wireless Bluetooth Headphones\",\"description\":\"Premium noise-cancelling headphones with 30-hour battery life\",\"price\":129.99,\"categoryId\":\"$ELECTRONICS_ID\",\"inventoryQuantity\":50,\"status\":\"active\"}"
+        "{\"title\":\"Smart Fitness Watch\",\"description\":\"Track your health and fitness with GPS and heart rate monitoring\",\"price\":199.99,\"categoryId\":\"$ELECTRONICS_ID\",\"inventoryQuantity\":30,\"status\":\"active\"}"
+        "{\"title\":\"Organic Cotton T-Shirt\",\"description\":\"Comfortable and sustainable everyday wear\",\"price\":29.99,\"categoryId\":\"$CLOTHING_ID\",\"inventoryQuantity\":100,\"status\":\"active\"}"
+        "{\"title\":\"Stainless Steel Water Bottle\",\"description\":\"Keep your drinks cold for 24 hours or hot for 12 hours\",\"price\":34.99,\"categoryId\":\"$HOME_KITCHEN_ID\",\"inventoryQuantity\":75,\"status\":\"active\"}"
+        "{\"title\":\"Yoga Mat Premium\",\"description\":\"Non-slip eco-friendly yoga mat with carrying strap\",\"price\":49.99,\"categoryId\":\"$SPORTS_ID\",\"inventoryQuantity\":40,\"status\":\"active\"}"
+        "{\"title\":\"Laptop Backpack\",\"description\":\"Durable backpack with padded laptop compartment\",\"price\":79.99,\"categoryId\":\"$ACCESSORIES_ID\",\"inventoryQuantity\":60,\"status\":\"active\"}"
+        "{\"title\":\"Wireless Mouse\",\"description\":\"Ergonomic wireless mouse with precision tracking\",\"price\":39.99,\"categoryId\":\"$ELECTRONICS_ID\",\"inventoryQuantity\":80,\"status\":\"active\"}"
+        "{\"title\":\"Coffee Maker\",\"description\":\"Programmable coffee maker with thermal carafe\",\"price\":89.99,\"categoryId\":\"$HOME_KITCHEN_ID\",\"inventoryQuantity\":25,\"status\":\"active\"}"
+        "{\"title\":\"Running Shoes\",\"description\":\"Lightweight running shoes with superior cushioning\",\"price\":119.99,\"categoryId\":\"$SPORTS_ID\",\"inventoryQuantity\":45,\"status\":\"active\"}"
+        "{\"title\":\"Desk Lamp LED\",\"description\":\"Adjustable LED desk lamp with USB charging port\",\"price\":44.99,\"categoryId\":\"$HOME_OFFICE_ID\",\"inventoryQuantity\":55,\"status\":\"active\"}"
     )
     
     for product_data in "${PRODUCTS[@]}"; do
