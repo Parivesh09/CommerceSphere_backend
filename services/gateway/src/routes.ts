@@ -98,7 +98,7 @@ routes.forEach((route) => {
         proxyReq.write(bodyData);
       }
     },
-    onError: (err, req: any, res: unknown) => {
+    onError: (err, req: any, res: any) => {
       const authReq = req as AuthenticatedRequest;
       res.status(503).json({
         error: {

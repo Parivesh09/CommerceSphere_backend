@@ -368,7 +368,7 @@ export class OrderService {
     try {
       const event = {
         id: uuidv4(),
-        type: `order.${status.toLowerCase()}` as unknown,
+        type: `order.${status.toLowerCase()}`,
         aggregateId: orderId,
         payload: {
           orderId,
