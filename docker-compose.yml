@@ -112,6 +112,7 @@ services:
       SEARCH_SERVICE_URL: http://search:3006
       RECOMMENDATION_SERVICE_URL: http://recommendation:3007
       ANALYTICS_SERVICE_URL: http://analytics:3008
+      CART_SERVICE_URL: http://cart:3009
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
       interval: 10s
@@ -196,6 +197,7 @@ services:
       DB_USER: commercesphere
       DB_PASSWORD: commercesphere_dev
       KAFKA_BROKERS: kafka:9093
+      KAFKA_CLIENT_ID: order-service
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://localhost:3003/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
       interval: 30s
@@ -217,7 +219,7 @@ services:
       - "3004:3004"
     environment:
       PORT: 3004
-      DATABASE_URL: postgresql://commercesphere:commercesphere_dev@postgres:5432/payment_db
+      DATABASE_URL: postgresql://commercesphere:commercesphere_dev@postgres:5432/payment_service
       KAFKA_BROKERS: kafka:9093
       ORDER_SERVICE_URL: http://order:3003
     healthcheck:
@@ -241,7 +243,7 @@ services:
       - "3005:3005"
     environment:
       PORT: 3005
-      DATABASE_URL: postgresql://commercesphere:commercesphere_dev@postgres:5432/notification_db
+      DATABASE_URL: postgresql://commercesphere:commercesphere_dev@postgres:5432/notification_service
       KAFKA_BROKERS: kafka:9093
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://localhost:3005/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
@@ -293,7 +295,7 @@ services:
       - "3007:3007"
     environment:
       PORT: 3007
-      database_url: postgresql://commercesphere:commercesphere_dev@postgres:5432/recommendation_db
+      database_url: postgresql://commercesphere:commercesphere_dev@postgres:5432/recommendation_service
       redis_url: redis://redis:6379
       kafka_brokers: kafka:9093
     healthcheck:
@@ -323,8 +325,33 @@ services:
       DB_USER: commercesphere
       DB_PASSWORD: commercesphere_dev
       KAFKA_BROKERS: kafka:9093
+      KAFKA_CLIENT_ID: analytics-service
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://localhost:3008/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+
+  # Cart Service
+  cart:
+    build:
+      context: .
+      dockerfile: services/cart/Dockerfile
+    container_name: commercesphere-cart
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "3009:3009"
+    environment:
+      PORT: 3009
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: cart_service
+      DB_USER: commercesphere
+      DB_PASSWORD: commercesphere_dev
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3009/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
       interval: 30s
       timeout: 3s
       retries: 3

@@ -13,6 +13,7 @@
     "services/search",
     "services/recommendation",
     "services/analytics",
+    "services/cart",
     "shared/types",
     "shared/utils",
     "tests/integration",

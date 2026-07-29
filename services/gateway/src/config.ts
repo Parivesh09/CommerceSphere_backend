@@ -21,6 +21,7 @@ export const config = {
     search: getEnv('SEARCH_SERVICE_URL', 'http://localhost:3006'),
     recommendation: getEnv('RECOMMENDATION_SERVICE_URL', 'http://localhost:3007'),
     analytics: getEnv('ANALYTICS_SERVICE_URL', 'http://localhost:3008'),
+    cart: getEnv('CART_SERVICE_URL', 'http://localhost:3009'),
   },
   ssl: {
     enabled: getEnv('SSL_ENABLED', 'false') === 'true',

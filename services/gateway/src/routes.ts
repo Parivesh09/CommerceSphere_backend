@@ -86,6 +86,12 @@ const routes = [
     target: config.services.analytics,
     requiresAuth: true,
   },
+
+  {
+    path: '/cart',
+    target: config.services.cart,
+    requiresAuth: true,
+  },
 ];
 
 /**

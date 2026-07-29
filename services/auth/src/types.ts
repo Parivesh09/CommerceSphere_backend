@@ -1,11 +1,11 @@
-import { User } from '@commercesphere/types';
+import { User, UserRole } from '@commercesphere/types';
 
 export interface UserRecord {
   id: string;
   email: string;
   password_hash: string;
   name: string;
-  role: string;
+  role: UserRole;
   avatar_url: string | null;
   phone: string | null;
   created_at: Date;

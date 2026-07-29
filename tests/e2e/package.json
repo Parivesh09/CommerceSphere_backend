@@ -4,6 +4,7 @@
   "description": "End-to-end tests for CommerceSphere platform",
   "private": true,
   "scripts": {
+    "build": "",
     "test": "jest --runInBand --detectOpenHandles",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
