@@ -28,6 +28,30 @@ const routes = [
   },
 
   {
+    path: '/categories',
+    target: config.services.product,
+    requiresAuth: false,
+  },
+
+  {
+    path: '/variants',
+    target: config.services.product,
+    requiresAuth: false,
+  },
+
+  {
+    path: '/images',
+    target: config.services.product,
+    requiresAuth: false,
+  },
+
+  {
+    path: '/inventory',
+    target: config.services.product,
+    requiresAuth: true,
+  },
+
+  {
     path: '/orders',
     target: config.services.order,
     requiresAuth: true,
@@ -68,14 +92,21 @@ const routes = [
  * Configure proxy routes
  */
 routes.forEach((route) => {
+  // Custom path rewrite for services that mount routes at a different prefix
+  const pathRewrite: Record<string, string> = {};
+  if (route.path === '/recommendations') {
+    // Recommendation service (FastAPI) mounts routes under /api prefix
+    pathRewrite['^/recommendations'] = '/api/recommendations';
+  } else {
+    pathRewrite[`^${route.path}`] = route.path;
+  }
+
   const proxyMiddleware = createProxyMiddleware({
     target: route.target,
     changeOrigin: true,
     timeout: 30000,
     proxyTimeout: 30000,
-    pathRewrite: {
-      [`^${route.path}`]: route.path, // Keep the path as-is
-    },
+    pathRewrite,
     logLevel: 'debug',
     onProxyReq: (proxyReq, req: any) => {
       // Forward correlation ID
@@ -115,7 +146,13 @@ routes.forEach((route) => {
   // Mount each proxy at its specific path with appropriate auth middleware
   if (route.requiresAuth) {
     router.use(route.path, jwtValidationMiddleware, proxyMiddleware);
-  } else if (route.path === '/products' || route.path === '/recommendations') {
+  } else if (
+    route.path === '/products' ||
+    route.path === '/recommendations' ||
+    route.path === '/categories' ||
+    route.path === '/variants' ||
+    route.path === '/images'
+  ) {
     router.use(route.path, optionalJwtValidationMiddleware, proxyMiddleware);
   } else {
     router.use(route.path, proxyMiddleware);
