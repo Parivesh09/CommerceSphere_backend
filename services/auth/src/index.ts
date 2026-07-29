@@ -1,5 +1,7 @@
 import 'dotenv/config';
 import express from 'express';
+import path from 'path';
+import fs from 'fs';
 import { 
   createLogger, 
   corsMiddleware, 
@@ -56,6 +58,8 @@ app.get('/health', (req, res) => {
 });
 
 
+app.use('/uploads/avatars', express.static(path.join(__dirname, '../uploads/avatars')));
+
 app.use('/auth', authRoutes);
 
 
@@ -67,6 +71,9 @@ app.use(errorHandler);
 
 const startServer = async () => {
   try {
+
+    const avatarsDir = path.join(__dirname, '../uploads/avatars');
+    fs.mkdirSync(avatarsDir, { recursive: true });
 
     await initDatabase();
     logger.info('Database initialized');

@@ -52,10 +52,29 @@ export const initDatabase = async (): Promise<void> => {
         created_at TIMESTAMP DEFAULT NOW()
       );
 
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url VARCHAR(512);
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(20);
+
+      CREATE TABLE IF NOT EXISTS addresses (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+        label VARCHAR(100) NOT NULL DEFAULT 'Home',
+        street VARCHAR(255) NOT NULL,
+        city VARCHAR(100) NOT NULL,
+        state VARCHAR(100) NOT NULL,
+        postal_code VARCHAR(20) NOT NULL,
+        country VARCHAR(100) NOT NULL,
+        phone VARCHAR(20),
+        is_default BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      );
+
       CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
       CREATE INDEX IF NOT EXISTS idx_refresh_tokens_token ON refresh_tokens(token);
       CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user_id ON refresh_tokens(user_id);
       CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_token ON password_reset_tokens(token);
+      CREATE INDEX IF NOT EXISTS idx_addresses_user_id ON addresses(user_id);
     `);
     logger.info('Database schema initialized successfully');
   } catch (error) {

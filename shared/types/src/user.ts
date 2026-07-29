@@ -1,8 +1,12 @@
+export type UserRole = 'customer' | 'seller' | 'admin' | 'moderator';
+
 export interface User {
   id: string;
   email: string;
   name: string;
-  role: 'customer' | 'admin' | 'moderator';
+  role: UserRole;
+  avatarUrl?: string;
+  phone?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -10,7 +14,7 @@ export interface User {
 export interface JWTPayload {
   sub: string;
   email: string;
-  role: string;
+  role: UserRole;
   iat: number;
   exp: number;
 }

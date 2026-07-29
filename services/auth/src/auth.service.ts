@@ -16,13 +16,18 @@ import {
   PasswordResetComplete,
   RefreshTokenRecord,
   PasswordResetTokenRecord,
+  UpdateProfileRequest,
+  ChangePasswordRequest,
+  AddressRecord,
+  CreateAddressRequest,
+  UpdateAddressRequest,
 } from './types';
 
 const logger = createLogger({ serviceName: 'auth-service' });
 
 export class AuthService {
   async register(data: RegisterRequest): Promise<User> {
-    const { email, password, name } = data;
+    const { email, password, name, role } = data;
 
 
     if (!email || !password || !name) {
@@ -47,11 +52,12 @@ export class AuthService {
     const password_hash = await bcrypt.hash(password, config.bcryptRounds);
 
 
+    const userRole = (role === 'seller') ? 'seller' : 'customer';
     const result = await pool.query<UserRecord>(
       `INSERT INTO users (email, password_hash, name, role)
        VALUES ($1, $2, $3, $4)
        RETURNING id, email, name, role, created_at, updated_at`,
-      [email, password_hash, name, 'customer']
+      [email, password_hash, name, userRole]
     );
 
     const user = result.rows[0];
@@ -242,7 +248,7 @@ export class AuthService {
 
   async getUserById(userId: string): Promise<User> {
     const result = await pool.query<UserRecord>(
-      `SELECT id, email, name, role, created_at, updated_at FROM users WHERE id = $1`,
+      `SELECT id, email, name, role, avatar_url, phone, created_at, updated_at FROM users WHERE id = $1`,
       [userId]
     );
 
@@ -251,6 +257,246 @@ export class AuthService {
     }
 
     return this.mapToUser(result.rows[0]);
+  }
+
+  async updateProfile(userId: string, data: UpdateProfileRequest): Promise<User> {
+    const fields: string[] = [];
+    const values: any[] = [];
+    let paramIndex = 1;
+
+    if (data.name !== undefined) {
+      fields.push(`name = $${paramIndex++}`);
+      values.push(data.name);
+    }
+    if (data.email !== undefined) {
+      const existing = await this.findUserByEmail(data.email);
+      if (existing && existing.id !== userId) {
+        throw new ConflictError('Email already in use');
+      }
+      fields.push(`email = $${paramIndex++}`);
+      values.push(data.email);
+    }
+    if (data.phone !== undefined) {
+      fields.push(`phone = $${paramIndex++}`);
+      values.push(data.phone);
+    }
+
+    if (fields.length === 0) {
+      throw new ValidationError('No fields to update');
+    }
+
+    fields.push(`updated_at = NOW()`);
+    values.push(userId);
+
+    const result = await pool.query<UserRecord>(
+      `UPDATE users SET ${fields.join(', ')} WHERE id = $${paramIndex}
+       RETURNING id, email, name, role, avatar_url, phone, created_at, updated_at`,
+      values
+    );
+
+    if (result.rows.length === 0) {
+      throw new NotFoundError('User');
+    }
+
+    logger.info('Profile updated', { userId });
+    return this.mapToUser(result.rows[0]);
+  }
+
+  async changePassword(userId: string, data: ChangePasswordRequest): Promise<void> {
+    const { currentPassword, newPassword } = data;
+
+    if (!currentPassword || !newPassword) {
+      throw new ValidationError('Current password and new password are required');
+    }
+
+    if (newPassword.length < 8) {
+      throw new ValidationError('New password must be at least 8 characters long');
+    }
+
+    const result = await pool.query<UserRecord>(
+      `SELECT * FROM users WHERE id = $1`,
+      [userId]
+    );
+
+    if (result.rows.length === 0) {
+      throw new NotFoundError('User');
+    }
+
+    const user = result.rows[0];
+    const isPasswordValid = await bcrypt.compare(currentPassword, user.password_hash);
+    if (!isPasswordValid) {
+      throw new UnauthorizedError('Current password is incorrect');
+    }
+
+    const password_hash = await bcrypt.hash(newPassword, config.bcryptRounds);
+
+    await pool.query(
+      `UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2`,
+      [password_hash, userId]
+    );
+
+    logger.info('Password changed', { userId });
+  }
+
+  async updateAvatar(userId: string, avatarUrl: string): Promise<User> {
+    const result = await pool.query<UserRecord>(
+      `UPDATE users SET avatar_url = $1, updated_at = NOW() WHERE id = $2
+       RETURNING id, email, name, role, avatar_url, phone, created_at, updated_at`,
+      [avatarUrl, userId]
+    );
+
+    if (result.rows.length === 0) {
+      throw new NotFoundError('User');
+    }
+
+    logger.info('Avatar updated', { userId });
+    return this.mapToUser(result.rows[0]);
+  }
+
+  async getAddresses(userId: string): Promise<AddressRecord[]> {
+    const result = await pool.query<AddressRecord>(
+      `SELECT * FROM addresses WHERE user_id = $1 ORDER BY is_default DESC, created_at DESC`,
+      [userId]
+    );
+
+    return result.rows;
+  }
+
+  async createAddress(userId: string, data: CreateAddressRequest): Promise<AddressRecord> {
+    const { label, street, city, state, postalCode, country, phone } = data;
+
+    const existingCount = await pool.query(
+      `SELECT COUNT(*) FROM addresses WHERE user_id = $1`,
+      [userId]
+    );
+    const isDefault = parseInt(existingCount.rows[0].count, 10) === 0;
+
+    const result = await pool.query<AddressRecord>(
+      `INSERT INTO addresses (user_id, label, street, city, state, postal_code, country, phone, is_default)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+       RETURNING *`,
+      [userId, label || 'Home', street, city, state, postalCode, country, phone || null, isDefault]
+    );
+
+    logger.info('Address created', { userId, addressId: result.rows[0].id });
+    return result.rows[0];
+  }
+
+  async updateAddress(addressId: string, userId: string, data: UpdateAddressRequest): Promise<AddressRecord> {
+    const fields: string[] = [];
+    const values: any[] = [];
+    let paramIndex = 1;
+
+    if (data.label !== undefined) {
+      fields.push(`label = $${paramIndex++}`);
+      values.push(data.label);
+    }
+    if (data.street !== undefined) {
+      fields.push(`street = $${paramIndex++}`);
+      values.push(data.street);
+    }
+    if (data.city !== undefined) {
+      fields.push(`city = $${paramIndex++}`);
+      values.push(data.city);
+    }
+    if (data.state !== undefined) {
+      fields.push(`state = $${paramIndex++}`);
+      values.push(data.state);
+    }
+    if (data.postalCode !== undefined) {
+      fields.push(`postal_code = $${paramIndex++}`);
+      values.push(data.postalCode);
+    }
+    if (data.country !== undefined) {
+      fields.push(`country = $${paramIndex++}`);
+      values.push(data.country);
+    }
+    if (data.phone !== undefined) {
+      fields.push(`phone = $${paramIndex++}`);
+      values.push(data.phone);
+    }
+
+    if (fields.length === 0) {
+      throw new ValidationError('No fields to update');
+    }
+
+    fields.push(`updated_at = NOW()`);
+    values.push(addressId);
+    values.push(userId);
+
+    const result = await pool.query<AddressRecord>(
+      `UPDATE addresses SET ${fields.join(', ')}
+       WHERE id = $${paramIndex} AND user_id = $${paramIndex + 1}
+       RETURNING *`,
+      values
+    );
+
+    if (result.rows.length === 0) {
+      throw new NotFoundError('Address');
+    }
+
+    logger.info('Address updated', { addressId, userId });
+    return result.rows[0];
+  }
+
+  async deleteAddress(addressId: string, userId: string): Promise<void> {
+    const result = await pool.query(
+      `DELETE FROM addresses WHERE id = $1 AND user_id = $2 RETURNING is_default`,
+      [addressId, userId]
+    );
+
+    if (result.rows.length === 0) {
+      throw new NotFoundError('Address');
+    }
+
+    const wasDefault = result.rows[0].is_default;
+    if (wasDefault) {
+      const next = await pool.query<AddressRecord>(
+        `SELECT * FROM addresses WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1`,
+        [userId]
+      );
+      if (next.rows.length > 0) {
+        await pool.query(
+          `UPDATE addresses SET is_default = TRUE WHERE id = $1`,
+          [next.rows[0].id]
+        );
+      }
+    }
+
+    logger.info('Address deleted', { addressId, userId });
+  }
+
+  async setDefaultAddress(addressId: string, userId: string): Promise<AddressRecord> {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      await client.query(
+        `UPDATE addresses SET is_default = FALSE, updated_at = NOW() WHERE user_id = $1`,
+        [userId]
+      );
+
+      const result = await client.query<AddressRecord>(
+        `UPDATE addresses SET is_default = TRUE, updated_at = NOW()
+         WHERE id = $1 AND user_id = $2
+         RETURNING *`,
+        [addressId, userId]
+      );
+
+      if (result.rows.length === 0) {
+        await client.query('ROLLBACK');
+        throw new NotFoundError('Address');
+      }
+
+      await client.query('COMMIT');
+      logger.info('Default address set', { addressId, userId });
+      return result.rows[0];
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   verifyAccessToken(token: string): JWTPayload {
@@ -308,6 +554,8 @@ export class AuthService {
       email: userRecord.email,
       name: userRecord.name,
       role: userRecord.role as 'customer' | 'admin' | 'moderator',
+      avatarUrl: userRecord.avatar_url || undefined,
+      phone: userRecord.phone || undefined,
       createdAt: new Date(userRecord.created_at),
       updatedAt: new Date(userRecord.updated_at),
     };
