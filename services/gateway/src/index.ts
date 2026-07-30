@@ -24,9 +24,8 @@ app.use(helmet());
 app.use(cors());
 
 /**
- * Parse JSON bodies
+ * Body parsing is handled by http-proxy natively via req.pipe(proxyReq)
  */
-app.use(express.json());
 
 /**
  * Apply global middleware

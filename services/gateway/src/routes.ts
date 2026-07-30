@@ -127,13 +127,8 @@ routes.forEach((route) => {
         proxyReq.setHeader('X-User-Role', req.user.role);
       }
       
-      // Fix body forwarding for POST/PUT/PATCH requests
-      if (req.body && (req.method === 'POST' || req.method === 'PUT' || req.method === 'PATCH')) {
-        const bodyData = JSON.stringify(req.body);
-        proxyReq.setHeader('Content-Type', 'application/json');
-        proxyReq.setHeader('Content-Length', Buffer.byteLength(bodyData));
-        proxyReq.write(bodyData);
-      }
+      // Body is forwarded natively by http-proxy via req.pipe(proxyReq)
+      // No manual body forwarding needed
     },
     onError: (err, req: any, res: any) => {
       const authReq = req as AuthenticatedRequest;
